@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+# The GitHub Actions workflow passes these via TF_VAR_* env vars instead,
+# so terraform.tfvars is only needed for local runs (Use case B).
+
+aws_region       = "us-east-1"
+dags_bucket_name = "airflow-dags-arvind-demo-CHANGE-ME" # must be globally unique
