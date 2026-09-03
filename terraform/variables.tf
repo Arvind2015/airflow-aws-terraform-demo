@@ -1,12 +1,17 @@
+# Single-environment demo: values are hardcoded here as defaults so the config
+# is self-contained (no GitHub Variables, no tfvars needed). Override per run
+# with -var / TF_VAR_* / terraform.tfvars if you ever need to.
+
 variable "aws_region" {
-  description = "AWS region to deploy into"
+  description = "AWS region for the DAGs bucket. MUST match region in backend.tf."
   type        = string
-  default     = "us-east-1"
+  default     = "eu-west-1"
 }
 
 variable "dags_bucket_name" {
-  description = "Globally unique name for the S3 bucket that holds Airflow DAG files"
+  description = "Name of the S3 bucket that holds Airflow DAG files"
   type        = string
+  default     = "prism-dags"
 }
 
 variable "dags_prefix" {

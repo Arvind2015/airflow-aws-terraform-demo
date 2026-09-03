@@ -14,7 +14,7 @@ terraform {
   backend "s3" {
     bucket       = "prism-airflow-tf-state"
     key          = "airflow-dags/terraform.tfstate"
-    region       = "eu-west-1"
+    region       = "eu-west-1" # keep in sync with var.aws_region (backends can't use variables)
     encrypt      = true
     use_lockfile = true # native S3 state locking (Terraform >= 1.11); no DynamoDB table needed
   }

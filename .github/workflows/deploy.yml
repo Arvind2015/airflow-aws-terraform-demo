@@ -4,10 +4,10 @@ name: Deploy
 #   - Pull request  -> terraform plan, posted as a PR comment (no changes applied)
 #   - Merge to main -> terraform apply, then sync dags/ to the S3 bucket
 #
-# One-time setup (see terraform/README.md):
-#   - GitHub repo Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-#   - GitHub repo Variables: AWS_REGION, DAGS_BUCKET
-#   - Create the Terraform state bucket named in terraform/backend.tf
+# Region and bucket name are hardcoded in the Terraform config (terraform/) and
+# below, so the only GitHub config needed is two repo Secrets:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+# (plus the Terraform state bucket named in terraform/backend.tf must exist).
 
 on:
   pull_request:
@@ -31,8 +31,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TF_VAR_aws_region: ${{ vars.AWS_REGION }}
-  TF_VAR_dags_bucket_name: ${{ vars.DAGS_BUCKET }}
+  AWS_REGION: eu-west-1
   TF_IN_AUTOMATION: "true"
 
 jobs:
@@ -56,7 +55,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: fmt
         run: terraform fmt -check -recursive
@@ -102,19 +101,22 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    outputs:
+      bucket: ${{ steps.tf.outputs.bucket }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: latest
+          terraform_wrapper: false   # so `terraform output` returns a clean value
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: init
         run: terraform init -input=false
@@ -122,12 +124,16 @@ jobs:
       - name: apply
         run: terraform apply -input=false -auto-approve
 
+      - name: Export outputs
+        id: tf
+        run: echo "bucket=$(terraform output -raw dags_bucket_name)" >> "$GITHUB_OUTPUT"
+
   # ---------------------------------------------------------------------------
   sync-dags:
     if: github.event_name == 'push'
     name: sync dags to S3
     runs-on: ubuntu-latest
-    needs: apply   # bucket must exist first
+    needs: apply   # bucket must exist first; also gives us its name
     steps:
       - uses: actions/checkout@v4
 
@@ -136,11 +142,11 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Sync DAGs
         run: |
-          aws s3 sync dags/ "s3://${{ vars.DAGS_BUCKET }}/dags/" \
+          aws s3 sync dags/ "s3://${{ needs.apply.outputs.bucket }}/dags/" \
             --delete \
             --exclude "*" \
             --include "*.py" \
