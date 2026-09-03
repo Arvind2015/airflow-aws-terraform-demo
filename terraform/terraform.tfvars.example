@@ -1,6 +1,8 @@
-# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
-# The GitHub Actions workflow passes these via TF_VAR_* env vars instead,
-# so terraform.tfvars is only needed for local runs (Use case B).
+# OPTIONAL. variables.tf now has working defaults (region eu-west-1,
+# bucket prism-dags), so `terraform apply` works with no tfvars at all.
+#
+# Only copy this to terraform.tfvars if you need to override a default
+# for a local run. terraform.tfvars is gitignored.
 
-aws_region       = "us-east-1"
-dags_bucket_name = "airflow-dags-arvind-demo-CHANGE-ME" # must be globally unique
+# aws_region       = "eu-west-1"
+# dags_bucket_name = "prism-dags"

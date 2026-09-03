@@ -15,6 +15,10 @@ The exact same Terraform code is run two ways:
 Both share the **same remote state** (S3 backend in `backend.tf`), so they act on
 one set of infrastructure.
 
+Region (`eu-west-1`) and bucket names are hardcoded in the config — see
+`variables.tf` and `backend.tf`. This is a single-environment demo; multi-env is
+deferred.
+
 ## What it creates
 
 | Resource | Purpose |
@@ -28,23 +32,25 @@ one set of infrastructure.
 1. **AWS credentials for CI.** In the AWS console create an IAM user with rights
    to manage S3 (for a demo, attach `PowerUserAccess`). Generate an access key.
 
-2. **Terraform state bucket.** Pick a globally-unique name, put it in
-   `backend.tf` (replace `airflow-tf-state-CHANGE-ME`), then create it:
+2. **Terraform state bucket.** Already created for this demo as
+   `prism-airflow-tf-state` (see `backend.tf`). To recreate from scratch:
 
    ```bash
-   aws s3 mb s3://<your-tf-state-bucket> --region us-east-1
-   aws s3api put-bucket-versioning --bucket <your-tf-state-bucket> \
+   aws s3 mb s3://prism-airflow-tf-state --region eu-west-1
+   aws s3api put-bucket-versioning --bucket prism-airflow-tf-state \
      --versioning-configuration Status=Enabled
    ```
 
-3. **GitHub repo config** (repo → Settings → Secrets and variables → Actions):
+3. **GitHub repo Secrets** (repo → Settings → Secrets and variables → Actions →
+   Secrets):
 
-   | Tab | Name | Value |
-   | --- | --- | --- |
-   | Secrets | `AWS_ACCESS_KEY_ID` | from step 1 |
-   | Secrets | `AWS_SECRET_ACCESS_KEY` | from step 1 |
-   | Variables | `AWS_REGION` | e.g. `us-east-1` |
-   | Variables | `DAGS_BUCKET` | globally-unique name for the DAGs bucket |
+   | Name | Value |
+   | --- | --- |
+   | `AWS_ACCESS_KEY_ID` | from step 1 |
+   | `AWS_SECRET_ACCESS_KEY` | from step 1 |
+
+   No repo Variables are needed — region and bucket name live in the Terraform
+   config and `deploy.yml`.
 
 That's the whole setup. Nothing here is repeated per merge.
 
@@ -57,7 +63,7 @@ Nothing to run by hand. `.github/workflows/deploy.yml`:
 - **On a pull request** touching `terraform/**` or `dags/**` → `terraform plan`,
   posted as a PR comment. No changes applied.
 - **On merge to `main`** → `terraform apply` → then `aws s3 sync dags/` into the
-  bucket.
+  bucket (the sync step reads the bucket name from `terraform output`).
 
 `.github/workflows/release.yml` separately creates a semantic-version tag +
 GitHub Release on each merge to `main` (Conventional Commit messages drive the
@@ -67,8 +73,7 @@ bump: `feat:` = minor, `fix:` = patch).
 
 ```bash
 cd terraform
-aws configure                          # your AWS account
-cp terraform.tfvars.example terraform.tfvars   # set dags_bucket_name (same as DAGS_BUCKET)
+aws configure          # your AWS account
 
 terraform init
 terraform fmt
@@ -77,8 +82,9 @@ terraform plan
 terraform apply
 ```
 
-Because the state bucket in `backend.tf` is the same one CI uses, a local
-`apply` and a CI `apply` see the same state — don't run both at the same moment.
+No `terraform.tfvars` needed — `variables.tf` has working defaults. Because the
+state bucket in `backend.tf` is the same one CI uses, a local `apply` and a CI
+`apply` see the same state — don't run both at the same moment.
 
 ---
 
@@ -88,10 +94,10 @@ Because the state bucket in `backend.tf` is the same one CI uses, a local
 | --- | --- |
 | `backend.tf` | S3 remote state config (shared by local + CI) |
 | `providers.tf` | Terraform + AWS provider versions, default tags |
-| `variables.tf` | `aws_region`, `dags_bucket_name`, `dags_prefix` |
+| `variables.tf` | `aws_region`, `dags_bucket_name`, `dags_prefix` — all with defaults |
 | `main.tf` | the DAGs S3 bucket |
 | `outputs.tf` | bucket name + `s3://` URI |
-| `terraform.tfvars.example` | copy to `terraform.tfvars` for local runs |
+| `terraform.tfvars.example` | optional local overrides |
 
 `terraform.tfvars` and `*.tfstate` are gitignored (root `.gitignore`).
 `.terraform.lock.hcl` should be committed.
