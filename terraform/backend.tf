@@ -5,16 +5,16 @@
 # Both must point at the same bucket/key so they operate on one state.
 #
 # ONE-TIME SETUP before the first `terraform init`:
-#   aws s3 mb s3://airflow-tf-state-CHANGE-ME --region us-east-1
-#   aws s3api put-bucket-versioning --bucket airflow-tf-state-CHANGE-ME \
+#   aws s3 mb s3://prism-airflow-tf-state --region eu-west-1
+#   aws s3api put-bucket-versioning --bucket prism-airflow-tf-state \
 #     --versioning-configuration Status=Enabled
 #
 # Bucket names are not secret, so it is fine to commit this.
 terraform {
   backend "s3" {
-    bucket       = "airflow-tf-state-CHANGE-ME"
+    bucket       = "prism-airflow-tf-state"
     key          = "airflow-dags/terraform.tfstate"
-    region       = "us-east-1"
+    region       = "eu-west-1"
     encrypt      = true
     use_lockfile = true # native S3 state locking (Terraform >= 1.11); no DynamoDB table needed
   }
